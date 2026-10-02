@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ML artifacts
+*.h5
+*.keras
+*.pt
+*.pth
+
+# Datasets
+data/*.csv
+data/*.txt
+
+# Experiment artifacts
+experiments/
+
+# IDE
+.vscode/
+.idea/
