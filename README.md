@@ -1,192 +1,86 @@
-# Intrusion Detection System
+# Network Intrusion Detection System
 
-A deep-learning based network intrusion detection system that compares **CNN, LSTM, and Transformer** architectures for binary network traffic classification.
-
-The system classifies network traffic as either **Normal** or **Attack** using the **NSL-KDD benchmark dataset** and exposes the trained CNN model through a lightweight **FastAPI** prediction service.
+Compares **CNN, LSTM, and Transformer** models for binary network traffic classification (Normal vs. Attack) on the NSL-KDD benchmark, and serves the trained CNN through a **FastAPI** prediction service.
 
 ## Overview
 
-This project explores different deep-learning architectures for network intrusion detection:
+- **CNN:** learns local patterns across the traffic features.
+- **LSTM:** models relationships across the feature sequence.
+- **Transformer:** uses self-attention to learn feature interactions.
 
-* **CNN** — learns local patterns from network traffic features.
-* **LSTM** — models sequential relationships between features.
-* **Transformer** — uses self-attention to learn feature relationships.
-
-The models are trained and evaluated using a consistent preprocessing pipeline with categorical feature encoding and standardization.
+All three models share one preprocessing pipeline (one-hot encoding of categorical features and standardization), so their results are directly comparable.
 
 ## Results
 
-Performance on the held-out NSL-KDD test set:
+Evaluated on a random 20% split of `KDDTrain+` (25,195 test records):
 
-| Model       | Test Accuracy |
-| ----------- | ------------: |
-| CNN         |       ~98–99% |
-| LSTM        |        98.60% |
-| Transformer |    **99.17%** |
+| Model | Test accuracy |
+|---|---:|
+| CNN | ~98–99%% |
+| LSTM | 98.60% |
+| Transformer | **99.17%** |
 
-### Transformer Classification Report
+Transformer classification report:
 
-| Class       | Precision |   Recall | F1-Score |
-| ----------- | --------: | -------: | -------: |
-| Normal      |      0.99 |     0.99 |     0.99 |
-| Attack      |      0.99 |     0.99 |     0.99 |
-| **Overall** |  **0.99** | **0.99** | **0.99** |
+| Class | Precision | Recall | F1-score | Support |
+|---|---:|---:|---:|---:|
+| Normal | 0.99 | 0.99 | 0.99 | 13,469 |
+| Attack | 0.99 | 0.99 | 0.99 | 11,726 |
 
-The Transformer achieved **99.17% accuracy** on the held-out test set.
+> **How to read these numbers:** the test records come from the same file as the training records, so the figures are optimistic. They are not comparable to published results on the official `KDDTest+` set, which is harder.
 
-## Architecture
+## Pipeline
 
 ```text
-                    NSL-KDD Dataset
-                           │
-                           ▼
-                Data Preprocessing
-                           │
-                ┌──────────┴──────────┐
-                │                     │
-          Categorical             Standard
-           Encoding              Scaling
-                │                     │
-                └──────────┬──────────┘
-                           │
-                    Feature Matrix
-                           │
-          ┌────────────────┼────────────────┐
-          │                │                │
-          ▼                ▼                ▼
-         CNN              LSTM         Transformer
-          │                │                │
-          └────────────────┼────────────────┘
-                           │
-                           ▼
-                  Binary Classification
-                     Normal / Attack
-                           │
-                           ▼
-                    Model Evaluation
-                           │
-                           ▼
-                     FastAPI Service
+NSL-KDD (KDDTrain+)
+        ↓
+Binary labels (0 = Normal, 1 = Attack)
+        ↓
+One-hot encoding → train/test split → standard scaling
+        ↓
+   CNN  |  LSTM  |  Transformer
+        ↓
+Evaluation → FastAPI service (CNN)
 ```
 
-## Dataset
+## Data
 
-The primary dataset used in this project is **NSL-KDD**, a benchmark dataset for network intrusion detection research.
+NSL-KDD is a benchmark dataset for network intrusion detection, with 41 traffic features per connection record. Download `KDDTrain+.txt` from https://www.unb.ca/cic/datasets/nsl.html and place it in `data/`. The dataset is not included in this repository.
 
-The dataset contains network connection records with numerical and categorical traffic features.
+Preprocessing:
 
-For this implementation, attack labels are converted into a binary classification task:
-
-* `0` → Normal
-* `1` → Attack
-
-Categorical features such as protocol, service, and flag are converted using one-hot encoding before standardization.
-
-## Preprocessing
-
-The preprocessing pipeline consists of:
-
-1. Loading the NSL-KDD training data.
-2. Converting attack labels into binary classes.
-3. One-hot encoding categorical features.
-4. Splitting the dataset into training and test sets.
-5. Standardizing features using `StandardScaler`.
-6. Reshaping the feature matrix for CNN and LSTM models.
-7. Saving the scaler and feature-column metadata for API inference.
-
-The same scaler used during training is loaded by the API to ensure consistent preprocessing during prediction.
+1. Load `KDDTrain+` and convert attack labels to binary classes.
+2. One-hot encode `protocol_type`, `service`, and `flag`.
+3. Split into training and test sets (80/20).
+4. Standardize features with `StandardScaler`.
+5. Reshape the matrix for the CNN and LSTM.
+6. Save the scaler and feature-column list so the API applies identical preprocessing.
 
 ## Models
 
-### CNN
+| Model | Architecture |
+|---|---|
+| CNN | Conv1D, batch normalization, dropout, dense layers, sigmoid output |
+| LSTM | LSTM, dropout, LSTM, dense layers, sigmoid output |
+| Transformer | Linear feature embedding, 3 encoder layers, 8 attention heads, binary output |
 
-The CNN uses one-dimensional convolutional layers to learn local patterns across the feature representation.
+The CNN's hyperparameters were tuned with Keras Tuner . The Transformer is trained in mini-batches to keep memory use manageable on local hardware.
 
-Architecture includes:
-
-* Conv1D
-* Batch Normalization
-* Dropout
-* Dense layers
-* Sigmoid output
-
-### LSTM
-
-The LSTM model uses recurrent layers to learn relationships across the feature sequence.
-
-Architecture includes:
-
-* LSTM
-* Dropout
-* LSTM
-* Dense layers
-* Sigmoid output
-
-### Transformer
-
-The Transformer model uses self-attention to model relationships between network traffic features.
-
-Architecture includes:
-
-* Linear feature embedding
-* Transformer Encoder
-* 3 encoder layers
-* 8 attention heads
-* Binary classification output
-
-Training uses mini-batches to keep memory usage manageable on local hardware.
-
-## Project Structure
-
-```text
-intrusion-detectionsystem/
-│
-├── README.md
-├── requirements.txt
-├── .gitignore
-│
-├── data/
-│   ├── KDDTrain+.txt
-│   └── Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv
-│
-├── models/
-│   ├── cnn_model.h5
-│   ├── scaler.pkl
-│   └── feature_columns.json
-│
-└── src/
-    ├── train_and_evaluate.py
-    └── api.py
-```
-
-Dataset and trained model artifacts are excluded from version control through `.gitignore`.
-
-## Installation
-
-Clone the repository:
+## Setup
 
 ```bash
-git clone https://github.com/shanumsharief/intrusion-detectionsystem-.git
-cd intrusion-detectionsystem-
-```
-
-Install dependencies:
-
-```bash
+git clone https://github.com/shanumsharief/intrusion-detectionsystem.git
+cd intrusion-detectionsystem
 python3 -m pip install -r requirements.txt
 ```
 
-## Training and Evaluation
-
-Run the complete training and evaluation pipeline:
+## Training and evaluation
 
 ```bash
 python3 src/train_and_evaluate.py
 ```
 
-This trains the CNN, LSTM, and Transformer models and evaluates them on the held-out test set.
-
-The pipeline also generates the preprocessing artifacts required by the API:
+This trains and evaluates all three models and saves the artifacts the API needs:
 
 ```text
 models/
@@ -197,88 +91,55 @@ models/
 
 ## API
 
-The project includes a FastAPI service for CNN-based traffic classification.
-
-Start the API:
+Start the service:
 
 ```bash
 python3 -m uvicorn src.api:app --reload
 ```
 
-The API will run locally at:
+Interactive docs are at `http://127.0.0.1:8000/docs`.
 
-```text
-http://127.0.0.1:8000
-```
-
-Interactive API documentation is available at:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-### Health Check
-
-```http
-GET /health
-```
-
-Example response:
+**`GET /health`**
 
 ```json
-{
-  "model_loaded": true,
-  "scaler_loaded": true
-}
+{ "model_loaded": true, "scaler_loaded": true }
 ```
 
-### Prediction
-
-```http
-POST /predict
-```
-
-The endpoint accepts a preprocessed feature vector and returns the predicted class and attack probability.
-
-Example response:
+**`POST /predict`** takes a preprocessed feature vector and returns the predicted class and attack probability.
 
 ```json
-{
-  "prediction": "Attack",
-  "attack_probability": 0.9993
-}
+{ "prediction": "Attack", "attack_probability": 0.9993 }
 ```
 
-## Technologies
+## Project structure
 
-* Python
-* TensorFlow / Keras
-* PyTorch
-* Scikit-learn
-* Pandas
-* NumPy
-* FastAPI
-* Uvicorn
+```text
+├── README.md
+├── requirements.txt
+├── data/               # NSL-KDD files (not in the repo)
+├── models/             # Trained CNN, scaler, feature columns (not in the repo)
+└── src/
+    ├── train_and_evaluate.py
+    └── api.py
+```
 
 ## Limitations
 
-This project is an experimental intrusion detection system evaluated on a benchmark dataset.
+- **Optimistic evaluation.** Accuracy comes from a random split of the training file, not the official `KDDTest+` set, which contains unseen attack types and gives much lower scores.
+- **No baseline.** I did not compare against a classical model such as Random Forest, which often matches deep networks on tabular data.
+- **Single run.** Results come from one training run with no confidence intervals, so small gaps between models (such as LSTM vs. Transformer) may not be meaningful.
+- **Preprocessed API input.** The API expects an already-processed feature vector, not raw connection fields or live traffic.
+- **Dated benchmark.** NSL-KDD derives from 1999-era traffic and does not represent modern networks.
 
-The reported accuracy reflects performance on the NSL-KDD test split and should not be interpreted as real-world network detection accuracy.
+## Future improvements
 
-The current API accepts a preprocessed feature vector rather than extracting network-flow features directly from live traffic.
-
-The CIC-IDS2017 dataset is included locally for future experimentation but is not part of the reported evaluation results.
-
-## Future Improvements
-
-* Evaluate models across multiple intrusion-detection datasets.
-* Extend the system to multiclass attack classification.
-* Add real-time network traffic processing.
-* Add automated feature extraction from network flows.
-* Compare additional machine-learning and deep-learning architectures.
-* Containerize the API for deployment.
+- Evaluate on the official `KDDTest+` set and add a Random Forest baseline
+- Run multiple seeds and report mean ± standard deviation
+- Report false positive rate, ROC-AUC, and a confusion matrix
+- Accept raw connection records in the API and preprocess them server-side
+- Extend to multiclass attack classification
+- Containerize the API with Docker
 
 ## License
 
-This project is intended for educational and portfolio purposes.
+MIT
