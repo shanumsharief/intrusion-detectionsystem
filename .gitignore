@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 env/
+*.egg-info/
 
 # macOS
 .DS_Store
@@ -11,18 +12,21 @@ env/
 # Jupyter
 .ipynb_checkpoints/
 
-# ML artifacts
-*.h5
-*.keras
+# Datasets (download separately, see README)
+data/*
+!data/.gitkeep
+
+# Experiment artifacts (Keras Tuner trials)
+experiments/
+
+# Large ML artifacts
 *.pt
 *.pth
+*.keras
 
-# Datasets
-data/*.csv
-data/*.txt
-
-# Experiment artifacts
-experiments/
+# Secrets and logs
+.env
+*.log
 
 # IDE
 .vscode/
